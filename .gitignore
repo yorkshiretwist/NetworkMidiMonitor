@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude Code
+.claude/
+
+# logs
+logs/
+*.log
+
+# editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.sw?

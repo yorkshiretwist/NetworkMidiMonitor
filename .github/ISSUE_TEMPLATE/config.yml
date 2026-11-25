@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/yorkshiretwist/NetworkMidiMonitor/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Documentation
+    url: https://github.com/yorkshiretwist/NetworkMidiMonitor#readme
+    about: The README has step-by-step connection guides and a troubleshooting section that may already answer your question.

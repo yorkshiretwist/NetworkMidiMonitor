@@ -1,0 +1,46 @@
+name: Compatibility report
+description: Tell us it works (or doesn't) with a MIDI sender or platform
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports like this help other people. The README lists what has been tested; if your setup is not there, please add it here.
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - It works
+        - It works with a workaround
+        - It does not work
+    validations:
+      required: true
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: Protocol
+      options:
+        - RTP-MIDI (Apple Network MIDI)
+        - UDP multicast MIDI (QmidiNet, ipMIDI, ...)
+    validations:
+      required: true
+  - type: input
+    id: sender
+    attributes:
+      label: Sender software or device, and its version
+      placeholder: "rtpMIDI on Windows 11 / iPad Network MIDI session / hardware unit ..."
+    validations:
+      required: true
+  - type: input
+    id: monitor
+    attributes:
+      label: Where the monitor runs
+      description: Operating system, Python version and monitor version.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything you had to do to make it work, or what you saw if it did not.

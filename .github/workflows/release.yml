@@ -1,0 +1,168 @@
+name: Release
+
+# Runs the tests, packages Network MIDI Monitor as a zip, then publishes a GitHub release.
+#
+# It runs ONLY when you push a version tag, e.g.
+#
+#     git checkout main && git pull
+#     git tag v0.2.0
+#     git push origin v0.2.0
+#
+# Ordinary pushes to main (docs, code, anything) never build a release. The tag must be on a commit
+# that is on main, and must match __version__ in networkmidimonitor/__init__.py, or the workflow
+# stops. The release notes are the section of release.md whose heading is "## <version>"; if there
+# is none, GitHub's generated notes are used instead.
+# You can also run it by hand from the Actions tab to get the zip as a build artifact without a release.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      publish: ${{ steps.read.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read the version and release notes
+        id: read
+        run: |
+          code_version=$(sed -nE 's/^__version__ = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' networkmidimonitor/__init__.py)
+          if [ -z "$code_version" ]; then
+            echo "::error::Could not read __version__ from networkmidimonitor/__init__.py"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "::error::Tag ${GITHUB_REF_NAME} is not on main. Releases are only made from main."
+              exit 1
+            fi
+            if [ "$version" != "$code_version" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match __version__ ($code_version) in networkmidimonitor/__init__.py."
+              exit 1
+            fi
+            publish=true
+          else
+            # a manual run: build only, no release
+            version="$code_version"
+            publish=false
+          fi
+          # the notes: everything under the "## <version>" heading, up to the next heading
+          awk -v v="$version" '
+            /^## /{ if (found) exit; if ($2 == v || $2 == "v" v) found=1; next }
+            found
+          ' release.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No section for $version in release.md; the release will use generated notes."
+            rm release-notes.md
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Version $version, publish=$publish"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: ignore
+
+  test:
+    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[test]"
+      - run: python -m pytest
+
+  package:
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Build the zip
+        run: python scripts/make_zip.py
+      - name: Show what is in it
+        run: python scripts/make_zip.py --list
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zip
+          path: dist/NetworkMidiMonitor-*.zip
+          if-no-files-found: error
+
+  release:
+    needs: [version, package]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the build attestation
+      attestations: write # store the build attestation
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Gather the files and work out their checksums
+        run: |
+          mkdir release-files
+          cp artifacts/zip/NetworkMidiMonitor-*.zip release-files/
+          cd release-files
+          sha256sum * > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
+          cat SHA256SUMS.txt
+
+      # lets anyone prove a download was built by this workflow from this repository:
+      #   gh attestation verify <file> --repo <owner>/NetworkMidiMonitor
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: release-files/*
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          v="v${{ needs.version.outputs.version }}"
+          if [ -f artifacts/release-notes/release-notes.md ]; then
+            # the notes from release.md, with the checksums added so they are visible without downloading anything
+            cp artifacts/release-notes/release-notes.md notes.md
+            {
+              echo
+              echo "### SHA-256 checksums"
+              echo
+              echo '```'
+              cat release-files/SHA256SUMS.txt
+              echo '```'
+            } >> notes.md
+            notes=(--notes-file notes.md)
+          else
+            # no section in release.md for this version: GitHub's generated notes (the checksums are attached as a file)
+            notes=(--generate-notes)
+          fi
+          gh release create "$v" \
+            --verify-tag \
+            --title "Network MIDI Monitor $v" \
+            "${notes[@]}" \
+            release-files/*

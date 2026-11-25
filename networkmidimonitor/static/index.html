@@ -1,0 +1,329 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network MIDI Monitor</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1c2128;--mute:#6b7480;--line:#dde1e6;--acc:#2563eb;--rtp:#0d9488;--mc:#d97706;--on:#16a34a;--off:#9ca3af;--cc:#7c3aed;--pb:#db2777;--bad:#dc2626}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1318;--panel:#171c23;--ink:#e6e9ee;--mute:#8b94a0;--line:#2a313b;--acc:#60a5fa;--rtp:#2dd4bf;--mc:#fbbf24;--on:#4ade80;--off:#6b7280;--cc:#a78bfa;--pb:#f472b6;--bad:#f87171}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,sans-serif;display:flex;flex-direction:column}
+.titlebar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);font-weight:600;gap:8px;flex-wrap:wrap}
+.titlebar .right{display:flex;align-items:center;gap:12px}
+button.danger:hover{border-color:var(--bad);color:var(--bad)}
+.status{font-weight:400;color:var(--mute);font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--bad);margin-right:4px}
+.dot.ok{background:var(--on)}
+.cols{display:grid;grid-template-columns:250px 1fr;flex:1;min-height:0}
+.side{border-right:1px solid var(--line);padding:12px;background:var(--bg);overflow-y:auto}
+.side h4{margin:0 0 6px;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.side section{margin-bottom:16px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13px;gap:6px}
+.row .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+.grow{flex:1}
+input,select,button{font:inherit;color:var(--ink)}
+input.s,select{border:1px solid var(--line);background:var(--panel);padding:5px 8px;border-radius:6px}
+input.s{min-width:160px}
+.side select,.side input.s{width:100%;min-width:0}
+button{border:1px solid var(--line);background:var(--panel);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 10px;font-size:12px;cursor:pointer}
+.chip.on{border-color:var(--acc);color:var(--acc)}
+.scroller{flex:1;overflow:auto;min-height:0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:4px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;color:var(--mute);font-weight:600;font-size:12px;background:var(--bg)}
+td.m{font-family:ui-monospace,Consolas,monospace}
+.tag{font-size:11px;border-radius:4px;padding:1px 6px;border:1px solid;margin-right:6px}
+.tag.rtp{color:var(--rtp);border-color:var(--rtp)}.tag.mc{color:var(--mc);border-color:var(--mc)}
+.k-note_on{color:var(--on)}.k-note_off{color:var(--off)}.k-control_change{color:var(--cc)}.k-pitch_bend{color:var(--pb)}
+.meter{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;margin-top:4px}
+.meter i{height:22px;background:var(--line);border-radius:2px;display:block;cursor:pointer;outline-offset:1px}
+.meter i.h1{background:var(--on);opacity:.4}.meter i.h2{background:var(--on);opacity:.7}.meter i.h3{background:var(--on);opacity:1}
+.meter i.sel{outline:2px solid var(--acc)}
+.note{color:var(--mute);font-size:12px}
+.err{color:var(--bad);font-size:12px;margin-bottom:4px}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 12px;background:var(--panel)}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 14px;font-size:14px;color:var(--mute)}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--acc);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg[hidden]{display:none}
+.seg button{border:0;border-radius:0;background:var(--panel)}
+.seg button.on{background:var(--acc);color:#fff}
+.tl{flex:1;min-height:0;display:flex;flex-direction:column}
+.tl[hidden]{display:none}
+.tlscroll{flex:1;overflow-y:auto;min-height:0}
+.tl canvas{display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:6px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}
+.legend i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:4px}
+#tip{position:fixed;z-index:10;background:var(--ink);color:var(--bg);font-size:12px;padding:5px 8px;border-radius:6px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#tip[hidden]{display:none}
+#tip .sub{opacity:.75}
+@media(max-width:700px){.cols{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--line);max-height:45vh}}
+</style>
+</head>
+<body>
+<div class="titlebar"><span>Network MIDI Monitor</span><span class="right"><span class="status"><span class="dot" id="dot"></span><span id="conn">Connecting…</span></span><button id="quit" class="danger" title="Stop the monitor">Quit</button></span></div>
+<div class="cols">
+ <aside class="side">
+  <section><h4>Interface</h4><select id="iface" aria-label="Network interface"></select></section>
+  <section><h4>Sources</h4>
+   <div id="peers"></div>
+   <div id="mcports"></div>
+   <div class="row" style="margin-top:6px"><input class="s" id="invhost" placeholder="Invite peer: host[:port]" aria-label="Invite RTP-MIDI peer"><button id="invbtn">Invite</button></div>
+   <div class="note" id="rtpinfo"></div>
+  </section>
+  <section><h4>Channels</h4>
+   <div class="meter" id="meter" aria-label="Channel activity"></div>
+   <div class="note" style="padding-top:4px">Click a bar to filter to that channel.</div>
+  </section>
+  <section><h4>Hide</h4>
+   <div class="row"><span>Clock / realtime</span><span class="chip" id="hideClock">off</span></div>
+   <div class="row"><span>Active sensing</span><span class="chip" id="hideSense">off</span></div>
+  </section>
+  <section><h4>Health</h4>
+   <div class="row"><span>Msgs/sec</span><b id="rate">0</b></div>
+   <div class="row"><span>Total</span><b id="total">0</b></div>
+   <div class="row"><span>Lost (RTP)</span><b id="lost">0</b></div>
+   <div id="notices"></div>
+  </section>
+ </aside>
+ <div class="main">
+  <div class="tabs" role="tablist">
+   <button role="tab" aria-selected="true" data-v="log">Log</button>
+   <button role="tab" aria-selected="false" data-v="timeline">Timeline</button>
+  </div>
+  <div class="bar">
+   <input class="s" id="search" placeholder="Search…" aria-label="Search">
+   <select id="type" aria-label="Message type">
+    <option value="">Type: All</option><option value="note">Notes</option><option value="cc">Control Change</option>
+    <option value="pb">Pitch Bend</option><option value="prog">Program Change</option><option value="at">Aftertouch</option>
+    <option value="sysex">SysEx</option><option value="rt">Clock / realtime</option><option value="other">Other</option>
+   </select>
+   <span class="grow"></span>
+   <span class="seg" id="segwrap" hidden title="Visible time window"><button data-w="5">5 s</button><button data-w="10" class="on">10 s</button><button data-w="30">30 s</button><button data-w="60">60 s</button></span>
+   <button id="pause">⏸ Pause</button><button id="clear">Clear</button>
+  </div>
+  <div class="scroller" id="scroller"><table>
+   <thead><tr><th>Time</th><th>Source</th><th>Ch</th><th>Message</th></tr></thead>
+   <tbody id="rows"></tbody>
+  </table></div>
+  <div id="tlview" class="tl" hidden>
+   <canvas id="tlaxis" aria-hidden="true"></canvas>
+   <div class="tlscroll"><canvas id="tlcanvas" role="img" aria-label="Timeline of recent MIDI messages by source and channel. The Log tab has the same messages as text."></canvas></div>
+   <div class="legend"><span><i style="background:var(--rtp)"></i>RTP note</span><span><i style="background:var(--mc)"></i>Multicast note</span><span><i style="background:var(--cc)"></i>Control change</span><span><i style="background:var(--pb)"></i>Pitch bend</span></div>
+  </div>
+ </div>
+</div>
+<div id="tip" hidden></div>
+<script>
+"use strict";
+const MAX = 5000, SHOW = 1000;
+let quitting = false;
+let view = "log", win = 10, frozen = null, skew = 0;  // timeline: tab, window (s), frozen "now" while paused, server-clock offset
+let all = [], paused = false, ws = null, state = null;
+const selCh = new Set(), chCount = new Array(17).fill(0);
+const $ = id => document.getElementById(id);
+const hide = {clock:false, sense:false};
+const GROUP = {note_on:"note",note_off:"note",control_change:"cc",pitch_bend:"pb",program_change:"prog",
+  poly_aftertouch:"at",channel_aftertouch:"at",sysex:"sysex",clock:"rt",start:"rt",continue:"rt",stop:"rt",system_reset:"rt"};
+
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
+
+function passes(ev){
+  if(hide.clock && ["clock","start","continue","stop"].includes(ev.kind)) return false;
+  if(hide.sense && ev.kind==="active_sensing") return false;
+  if(selCh.size && !selCh.has(ev.ch)) return false;
+  const t=$("type").value;
+  if(t && (GROUP[ev.kind]||"other")!==t) return false;
+  const q=$("search").value.trim().toLowerCase();
+  if(q && !(ev.text+" "+ev.source+" "+ev.raw).toLowerCase().includes(q)) return false;
+  return true;
+}
+function rowFor(ev){
+  const tr=el("tr"); tr.title=ev.raw;
+  const d=new Date(ev.t*1000), p=(n,w=2)=>String(n).padStart(w,"0");
+  tr.append(el("td","m",`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(),3)}`));
+  const src=el("td"); src.append(el("span","tag "+ev.proto, ev.proto==="rtp"?"RTP":"MC"), document.createTextNode(ev.source)); tr.append(src);
+  tr.append(el("td","",ev.ch??"-"));
+  tr.append(el("td","k-"+ev.kind, ev.text));
+  return tr;
+}
+function nearBottom(){ const s=$("scroller"); return s.scrollHeight-s.scrollTop-s.clientHeight<40; }
+function addEvents(evs){
+  for(const ev of evs){ all.push(ev); if(ev.ch) chCount[ev.ch]++; }
+  if(all.length>MAX) all=all.slice(-MAX);
+  if(paused) return;
+  const stick=nearBottom(), tb=$("rows");
+  for(const ev of evs) if(passes(ev)) tb.append(rowFor(ev));
+  while(tb.rows.length>SHOW) tb.deleteRow(0);
+  if(stick) $("scroller").scrollTop=$("scroller").scrollHeight;
+}
+function rerender(){
+  const tb=$("rows"); tb.replaceChildren();
+  const frag=document.createDocumentFragment(); let n=0;
+  for(let i=all.length-1;i>=0 && n<SHOW;i--) if(passes(all[i])){ frag.prepend(rowFor(all[i])); n++; }
+  tb.append(frag); $("scroller").scrollTop=$("scroller").scrollHeight;
+}
+
+function renderState(s){
+  state=s;
+  if(s.now) skew=s.now-Date.now()/1000;
+  const sel=$("iface"); sel.replaceChildren();
+  for(const i of s.interfaces){ const o=el("option","",`${i.name} (${i.ip})`); o.value=i.ip; o.selected=i.ip===s.interface; sel.append(o); }
+  const peers=$("peers"); peers.replaceChildren();
+  for(const p of s.rtp.peers){
+    const r=el("div","row"); const nm=el("span","nm"); nm.append(el("span","tag rtp","RTP"), document.createTextNode(p.name||p.host));
+    nm.title=`${p.host}${p.connected?"":" (connecting)"}`; r.append(nm);
+    const b=el("button","","×"); b.title="Disconnect"; b.onclick=()=>send({cmd:"disconnect",ssrc:p.ssrc}); r.append(b); peers.append(r);
+  }
+  const mc=$("mcports"); mc.replaceChildren();
+  for(const p of s.multicast.ports){
+    const r=el("div","row"); const nm=el("span","nm"); nm.append(el("span","tag mc","MC"), document.createTextNode(`${s.multicast.group}:${p.port}`)); r.append(nm);
+    const c=el("span","chip"+(p.enabled?" on":""),p.enabled?"on":"off"); c.onclick=()=>send({cmd:"mc_port",port:p.port,enabled:!p.enabled}); r.append(c); mc.append(r);
+  }
+  $("rtpinfo").textContent = s.rtp.port ? `RTP-MIDI session “${s.rtp.name}” on UDP ${s.rtp.port}/${s.rtp.port+1}` : "RTP-MIDI unavailable";
+  $("rate").textContent=s.stats.rate; $("total").textContent=s.stats.total.toLocaleString(); $("lost").textContent=s.stats.lost;
+  const n=$("notices"); n.replaceChildren(); for(const t of s.notices) n.append(el("div","err",t));
+  $("conn").textContent=`Listening · ${s.interface}`;
+}
+
+// channel meter: bars show messages in the last second
+const meter=$("meter");
+for(let c=1;c<=16;c++){ const i=el("i"); i.title="Channel "+c; i.onclick=()=>{ selCh.has(c)?selCh.delete(c):selCh.add(c); rerender(); }; meter.append(i); }
+setInterval(()=>{
+  [...meter.children].forEach((i,k)=>{ const n=chCount[k+1];
+    i.className=(n>=10?"h3":n>=3?"h2":n>=1?"h1":"")+(selCh.has(k+1)?" sel":""); });
+  chCount.fill(0);
+},1000);
+
+function connect(){
+  ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onopen=()=>{ $("dot").classList.add("ok"); };
+  ws.onclose=()=>{ $("dot").classList.remove("ok");
+    if(quitting){ $("conn").textContent="Monitor stopped. You can close this tab."; return; }
+    $("conn").textContent="Disconnected, retrying…"; setTimeout(connect,1500); };
+  ws.onmessage=m=>{ const d=JSON.parse(m.data);
+    if(d.type==="history"){ all=d.events; rerender(); }
+    else if(d.type==="events") addEvents(d.events);
+    else if(d.type==="state") renderState(d);
+    else if(d.type==="quitting") $("conn").textContent="Stopping…"; };
+}
+
+$("quit").onclick=()=>{
+  if(!confirm("Quit Network MIDI Monitor?\n\nThis stops the monitor and disconnects its RTP-MIDI peers. Start it again from the command line.")) return;
+  quitting=true; $("quit").disabled=true; send({cmd:"quit"});
+};
+$("iface").onchange=e=>send({cmd:"set_interface",ip:e.target.value});
+$("invbtn").onclick=()=>{ const v=$("invhost").value.trim(); if(v){ send({cmd:"invite",host:v}); $("invhost").value=""; } };
+$("invhost").onkeydown=e=>{ if(e.key==="Enter") $("invbtn").click(); };
+$("pause").onclick=()=>{ paused=!paused; frozen=paused?Date.now()/1000+skew:null; $("pause").textContent=paused?"▶ Resume":"⏸ Pause"; if(!paused) rerender(); };
+$("clear").onclick=()=>{ all=[]; $("rows").replaceChildren(); };
+$("search").oninput=rerender; $("type").onchange=rerender;
+for(const [id,key] of [["hideClock","clock"],["hideSense","sense"]]){
+  $(id).onclick=()=>{ hide[key]=!hide[key]; $(id).textContent=hide[key]?"on":"off"; $(id).classList.toggle("on",hide[key]); rerender(); };
+}
+// ---------------------------------------------------------------- timeline
+const STEP={5:1,10:2,30:5,60:10}, LABEL_W=70, LANE_H=26, HEAD_H=24;
+const tlCanvas=$("tlcanvas"), axCanvas=$("tlaxis"), tip=$("tip");
+let hits=[];
+const nowT=()=>frozen!==null?frozen:Date.now()/1000+skew;
+const fmtDur=s=>s<1?Math.round(s*1000)+" ms":s.toFixed(1)+" s";
+function setup(c,w,h){ const d=window.devicePixelRatio||1; c.width=Math.round(w*d); c.height=Math.round(h*d);
+  c.style.width=w+"px"; c.style.height=h+"px"; const g=c.getContext("2d"); g.setTransform(d,0,0,d,0,0); return g; }
+
+// Pair Note On/Off into spans and collect CC / pitch-bend ticks, grouped source -> channel.
+function buildTimeline(now){
+  const t0=now-win, open=new Map(), spans=[], ticks=[];
+  for(const ev of all){
+    if(ev.kind==="note_on"||ev.kind==="note_off"){
+      const key=ev.source+"|"+ev.ch+"|"+parseInt(ev.raw.split(" ")[1],16), o=open.get(key);
+      if(o){ o.t1=ev.t; open.delete(key); }
+      if(ev.kind==="note_on"){ const sp={kind:"note",ev,t0:ev.t,t1:null}; open.set(key,sp); spans.push(sp); }
+    } else if((ev.kind==="control_change"||ev.kind==="pitch_bend") && ev.t>=t0 && ev.t<=now) ticks.push({kind:"tick",ev});
+  }
+  const groups=new Map();
+  const add=(it)=>{ const ev=it.ev; if(!ev.ch||!passes(ev)) return;
+    let g=groups.get(ev.source); if(!g){ g={src:ev.source,proto:ev.proto,lanes:new Map()}; groups.set(ev.source,g); }
+    let l=g.lanes.get(ev.ch); if(!l){ l=[]; g.lanes.set(ev.ch,l); } l.push(it); };
+  for(const sp of spans) if(sp.t0<=now && (sp.t1??now)>=t0) add(sp);
+  for(const tk of ticks) add(tk);
+  return [...groups.values()]
+    .sort((a,b)=>(a.proto===b.proto?a.src.localeCompare(b.src):a.proto==="rtp"?-1:1))
+    .map(g=>({...g,lanes:[...g.lanes.entries()].sort((a,b)=>a[0]-b[0])}));
+}
+
+function drawTimeline(){
+  const w=tlCanvas.parentElement.clientWidth; if(!w) return;
+  const now=nowT(), t0=now-win, groups=buildTimeline(now), step=STEP[win];
+  const css=getComputedStyle(document.documentElement), col=n=>css.getPropertyValue(n).trim();
+  const px=t=>LABEL_W+(t-t0)/win*(w-LABEL_W-2);
+
+  const ag=setup(axCanvas,w,22); ag.font="11px system-ui"; ag.fillStyle=col("--mute"); ag.textBaseline="middle";
+  for(let k=0;k*step<=win;k++){ ag.textAlign=k?"center":"right"; ag.fillText(k?`-${k*step} s`:"now", px(now-k*step), 11); }
+
+  let total=0; for(const g of groups) total+=HEAD_H+g.lanes.length*LANE_H;
+  const H=Math.max(total,90), lg=setup(tlCanvas,w,H);
+  lg.strokeStyle=col("--line"); lg.lineWidth=1;
+  for(let k=0;k*step<=win;k++){ const x=Math.round(px(now-k*step))+.5; lg.beginPath(); lg.moveTo(x,0); lg.lineTo(x,H); lg.stroke(); }
+  lg.textBaseline="middle"; hits=[];
+  if(!groups.length){ lg.font="13px system-ui"; lg.fillStyle=col("--mute"); lg.textAlign="center";
+    lg.fillText(`No activity in the last ${win} s`, w/2, H/2); return; }
+
+  let y=0;
+  for(const g of groups){
+    const pc=col(g.proto==="rtp"?"--rtp":"--mc"), tag=g.proto==="rtp"?"RTP":"MC";
+    lg.fillStyle=col("--bg"); lg.fillRect(0,y,w,HEAD_H);
+    lg.font="11px system-ui"; const tw=lg.measureText(tag).width+10;
+    lg.strokeStyle=pc; lg.strokeRect(8.5,y+4.5,tw,HEAD_H-9);
+    lg.fillStyle=pc; lg.textAlign="left"; lg.fillText(tag,13,y+HEAD_H/2+.5);
+    lg.font="600 12px system-ui"; lg.fillStyle=col("--ink"); lg.fillText(g.src,8+tw+8,y+HEAD_H/2+.5);
+    y+=HEAD_H;
+    for(const [ch,items] of g.lanes){
+      lg.strokeStyle=col("--line"); lg.beginPath(); lg.moveTo(0,y+LANE_H-.5); lg.lineTo(w,y+LANE_H-.5); lg.stroke();
+      lg.font="12px system-ui"; lg.fillStyle=col("--mute"); lg.textAlign="left"; lg.fillText("Ch "+ch,16,y+LANE_H/2);
+      for(const it of items){
+        if(it.kind==="note"){
+          const end=Math.min(it.t1??now,now), x0=Math.max(px(it.t0),LABEL_W), x1=Math.min(px(end),w-2), bw=Math.max(x1-x0,3);
+          lg.fillStyle=col(g.proto==="rtp"?"--rtp":"--mc"); lg.fillRect(x0,y+7,bw,LANE_H-14);
+          hits.push({x0,x1:x0+bw,y0:y,y1:y+LANE_H,ev:it.ev,
+                     extra: it.t1!==null&&it.t1<=now ? " · "+fmtDur(it.t1-it.t0) : " · held "+fmtDur(now-it.t0)});
+        } else {
+          const x=px(it.ev.t); lg.fillStyle=col(it.ev.kind==="pitch_bend"?"--pb":"--cc"); lg.fillRect(x-1,y+4,3,LANE_H-8);
+          hits.push({x0:x-1,x1:x+2,y0:y,y1:y+LANE_H,ev:it.ev,extra:""});
+        }
+      }
+      y+=LANE_H;
+    }
+  }
+}
+setInterval(()=>{ if(view==="timeline") drawTimeline(); },66);
+
+tlCanvas.onmousemove=e=>{
+  const r=tlCanvas.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  let h=null; for(let i=hits.length-1;i>=0;i--){ const t=hits[i]; if(x>=t.x0-2&&x<=t.x1+2&&y>=t.y0&&y<=t.y1){ h=t; break; } }
+  if(!h){ tip.hidden=true; return; }
+  tip.replaceChildren(el("div","",`Ch ${h.ev.ch} · ${h.ev.text}${h.extra}`), el("div","sub",`${h.ev.proto==="rtp"?"RTP":"Multicast"} · ${h.ev.source}`));
+  tip.hidden=false; tip.style.left=Math.min(e.clientX+12,innerWidth-tip.offsetWidth-8)+"px"; tip.style.top=(e.clientY+14)+"px";
+};
+tlCanvas.onmouseleave=()=>{ tip.hidden=true; };
+
+for(const b of document.querySelectorAll(".tabs button")) b.onclick=()=>{
+  view=b.dataset.v;
+  for(const o of document.querySelectorAll(".tabs button")) o.setAttribute("aria-selected",o===b);
+  $("scroller").hidden=view!=="log"; $("tlview").hidden=view!=="timeline"; $("segwrap").hidden=view!=="timeline";
+  if(view==="log") rerender(); else drawTimeline();
+};
+for(const b of document.querySelectorAll("#segwrap button")) b.onclick=()=>{
+  win=+b.dataset.w; for(const o of document.querySelectorAll("#segwrap button")) o.classList.toggle("on",o===b); drawTimeline();
+};
+connect();
+</script>
+</body>
+</html>

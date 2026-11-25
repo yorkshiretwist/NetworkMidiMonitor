@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in the monitor does not work, or messages are missing or wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check the [troubleshooting section](https://github.com/yorkshiretwist/NetworkMidiMonitor#troubleshooting) of the README first.
+        **For a security problem, do not use this form**: see the security policy.
+        Please remove IP addresses and host names you would not want public from anything you attach.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part?
+      options:
+        - RTP-MIDI (rtpMIDI, rtpmidid, macOS, ...)
+        - Multicast MIDI (QmidiNet, ipMIDI, ...)
+        - Log tab
+        - Timeline tab
+        - Installing or starting the monitor
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Steps to reproduce it, as exactly as you can.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Monitor version
+      description: Run `python -m networkmidimonitor --version`.
+  - type: input
+    id: python
+    attributes:
+      label: Python version and operating system
+      placeholder: Python 3.13, Windows 11
+  - type: textarea
+    id: sender
+    attributes:
+      label: What is sending the MIDI?
+      description: The software and version, the operating system it runs on, and whether it is the same computer as the monitor, another computer on the same network, wired or Wi-Fi.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and screenshots
+      description: Run the monitor with `-v` and paste the terminal output. Include a screenshot of the sidebar if it helps (Sources, Interface, Health).

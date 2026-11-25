@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "networkmidimonitor"
+dynamic = ["version"]
+description = "Live, read-only monitor for RTP-MIDI and UDP multicast MIDI (rtpMIDI, rtpmidid, QmidiNet, ipMIDI)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD-PARTY-NOTICES.md"]
+authors = [{ name = "Chris Taylor" }]
+keywords = ["midi", "rtp-midi", "rtpmidi", "network-midi", "multicast", "ipmidi", "qmidinet", "monitor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = ["aiohttp>=3.9", "zeroconf>=0.130"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.urls]
+Homepage = "https://github.com/yorkshiretwist/NetworkMidiMonitor"
+Issues = "https://github.com/yorkshiretwist/NetworkMidiMonitor/issues"
+Documentation = "https://github.com/yorkshiretwist/NetworkMidiMonitor/blob/main/docs/developers.md"
+
+[project.scripts]
+networkmidimonitor = "networkmidimonitor.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "networkmidimonitor.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["networkmidimonitor*"]
+
+[tool.setuptools.package-data]
+networkmidimonitor = ["static/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
